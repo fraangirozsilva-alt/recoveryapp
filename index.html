@@ -1,0 +1,376 @@
+
+
+
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RecoveryApp — On-Demand Roadside Assistance & Towing</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 500: '#f97316', 600: '#ea580c' },
+            darkbg: '#0f172a',
+            darkcard: '#1e293b'
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    #map { height: 340px; width: 100%; border-radius: 0.75rem; z-index: 10; }
+    .leaflet-container { background: #1e293b; }
+  </style>
+</head>
+<body class="bg-darkbg text-slate-100 min-h-screen font-sans antialiased">
+
+  <!-- Navbar -->
+  <nav class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-2.5">
+        <div class="bg-brand-500 p-2 rounded-lg text-white">
+          <i data-lucide="truck" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <span class="font-bold text-xl tracking-tight text-white">Recovery<span class="text-brand-500">App</span></span>
+          <span class="hidden sm:inline-block ml-2 text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">Turnkey SaaS Demo</span>
+        </div>
+      </div>
+
+      <!-- View Switcher -->
+      <div class="flex bg-slate-800 p-1 rounded-xl border border-slate-700">
+        <button onclick="switchTab('client')" id="tab-client" class="tab-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-500 text-white transition">Client App</button>
+        <button onclick="switchTab('driver')" id="tab-driver" class="tab-btn px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white transition">Tow Driver</button>
+        <button onclick="switchTab('admin')" id="tab-admin" class="tab-btn px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white transition">Admin Panel</button>
+      </div>
+
+      <!-- Currency & Flippa Pitch Button -->
+      <div class="flex items-center gap-3">
+        <select id="currency-select" onchange="updateCurrency()" class="bg-slate-800 border border-slate-700 text-sm rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none">
+          <option value="USD">USD ($)</option>
+          <option value="EUR">EUR (€)</option>
+          <option value="CLP">CLP ($)</option>
+        </select>
+        <button onclick="toggleFlippaModal()" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5">
+          <i data-lucide="briefcase" class="w-4 h-4"></i> Investor Info
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="max-w-6xl mx-auto px-4 py-8">
+
+    <!-- ==================== CLIENT VIEW ==================== -->
+    <section id="view-client" class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <!-- Request Form -->
+      <div class="lg:col-span-5 bg-darkcard border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <h2 class="text-xl font-bold mb-1 flex items-center gap-2">
+          <i data-lucide="navigation" class="w-5 h-5 text-brand-500"></i> Request Roadside Assistance
+        </h2>
+        <p class="text-slate-400 text-sm mb-6">Instant dispatch & transparent pricing.</p>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Service Type</label>
+            <div class="grid grid-cols-2 gap-2.5">
+              <button type="button" onclick="selectService('Flatbed Tow', 1.0, this)" class="service-opt border border-brand-500 bg-brand-500/10 text-white p-3 rounded-xl text-left text-sm font-medium flex items-center gap-2">
+                <i data-lucide="truck" class="w-4 h-4 text-brand-500"></i> Flatbed Tow
+              </button>
+              <button type="button" onclick="selectService('Jump Start', 0.5, this)" class="service-opt border border-slate-700 bg-slate-800/50 text-slate-300 p-3 rounded-xl text-left text-sm font-medium flex items-center gap-2">
+                <i data-lucide="battery-charging" class="w-4 h-4 text-amber-400"></i> Battery Boost
+              </button>
+              <button type="button" onclick="selectService('Tire Change', 0.6, this)" class="service-opt border border-slate-700 bg-slate-800/50 text-slate-300 p-3 rounded-xl text-left text-sm font-medium flex items-center gap-2">
+                <i data-lucide="disc" class="w-4 h-4 text-sky-400"></i> Flat Tire
+              </button>
+              <button type="button" onclick="selectService('Fuel Delivery', 0.55, this)" class="service-opt border border-slate-700 bg-slate-800/50 text-slate-300 p-3 rounded-xl text-left text-sm font-medium flex items-center gap-2">
+                <i data-lucide="fuel" class="w-4 h-4 text-emerald-400"></i> Fuel Delivery
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Pickup Location</label>
+            <input id="pickup-input" type="text" value="Av. Apoquindo 4500, Las Condes" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-brand-500 focus:outline-none" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Drop-off Destination</label>
+            <input id="dropoff-input" type="text" value="AutoService Center, Vitacura" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-brand-500 focus:outline-none" />
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs font-semibold text-slate-400 mb-1">
+              <span>ESTIMATED DISTANCE</span>
+              <span id="km-display" class="text-brand-500 font-bold">12 km</span>
+            </div>
+            <input id="distance-slider" type="range" min="2" max="60" value="12" oninput="recalculateFare()" class="w-full accent-brand-500 cursor-pointer" />
+          </div>
+
+          <!-- Price Box -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+            <div>
+              <p class="text-xs text-slate-400">Estimated Total Fare</p>
+              <p id="fare-amount" class="text-2xl font-extrabold text-white">$61.00</p>
+            </div>
+            <span class="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700">ETA: ~14 mins</span>
+          </div>
+
+          <button onclick="submitRequest()" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-brand-500/20 transition flex items-center justify-center gap-2">
+            <i data-lucide="shield-alert" class="w-5 h-5"></i> Confirm & Request Recovery
+          </button>
+        </div>
+      </div>
+
+      <!-- Map & Active Status -->
+      <div class="lg:col-span-7 space-y-6">
+        <div class="bg-darkcard border border-slate-800 rounded-2xl p-4 shadow-xl">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm font-semibold flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span> Live GPS Dispatch Map
+            </span>
+            <span class="text-xs text-slate-400">3 Tow Trucks Nearby</span>
+          </div>
+          <div id="map"></div>
+        </div>
+
+        <!-- Active Order Tracker -->
+        <div id="active-order-card" class="bg-darkcard border border-slate-800 rounded-2xl p-6">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <span class="text-xs uppercase tracking-wider text-brand-500 font-bold">Active Dispatch #REC-809</span>
+              <h3 id="client-status-title" class="text-lg font-bold">Waiting for Request...</h3>
+            </div>
+            <span id="client-status-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">Idle</span>
+          </div>
+          <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+            <div id="progress-bar" class="bg-brand-500 h-full transition-all duration-500" style="width: 10%"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== DRIVER VIEW ==================== -->
+    <section id="view-driver" class="hidden max-w-3xl mx-auto space-y-6">
+      <div class="bg-darkcard border border-slate-800 rounded-2xl p-6 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 rounded-full bg-brand-500/20 border border-brand-500 flex items-center justify-center text-brand-500 font-bold text-lg">CR</div>
+          <div>
+            <h2 class="font-bold text-lg">Carlos Rojas — Flatbed Unit #04</h2>
+            <p class="text-xs text-slate-400">Plate: KLPX-88 • Rating: 4.9 ★</p>
+          </div>
+        </div>
+        <button id="driver-online-btn" onclick="toggleDriverOnline()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition">
+          ● Online & Ready
+        </button>
+      </div>
+
+      <div id="driver-job-box" class="bg-darkcard border border-slate-800 rounded-2xl p-6 space-y-4">
+        <div class="flex justify-between items-start">
+          <div>
+            <span class="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-full font-semibold">Incoming Recovery Request</span>
+            <h3 id="driver-job-service" class="text-xl font-bold mt-2">Flatbed Tow (12 km)</h3>
+          </div>
+          <div class="text-right">
+            <p class="text-xs text-slate-400">Driver Payout (85%)</p>
+            <p id="driver-payout" class="text-2xl font-extrabold text-emerald-400">$51.85</p>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 rounded-xl p-4 space-y-2 text-sm border border-slate-800">
+          <p><span class="text-slate-400">Pickup:</span> <span id="driver-pickup" class="font-medium">Av. Apoquindo 4500, Las Condes</span></p>
+          <p><span class="text-slate-400">Drop-off:</span> <span id="driver-dropoff" class="font-medium">AutoService Center, Vitacura</span></p>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button onclick="advanceJobStatus()" id="driver-action-btn" class="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-bold py-3 rounded-xl transition">
+            Accept Recovery Job
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== ADMIN VIEW ==================== -->
+    <section id="view-admin" class="hidden space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-darkcard border border-slate-800 rounded-2xl p-6">
+          <p class="text-xs uppercase text-slate-400 font-semibold">Total Gross Volume (GMV)</p>
+          <p id="admin-gmv" class="text-3xl font-extrabold mt-2">$4,820.00</p>
+          <span class="text-xs text-emerald-400">+18.4% this month</span>
+        </div>
+        <div class="bg-darkcard border border-slate-800 rounded-2xl p-6">
+          <p class="text-xs uppercase text-slate-400 font-semibold">Platform Commission (15%)</p>
+          <p id="admin-commission" class="text-3xl font-extrabold text-brand-500 mt-2">$723.00</p>
+          <span class="text-xs text-slate-400">Automated split revenue</span>
+        </div>
+        <div class="bg-darkcard border border-slate-800 rounded-2xl p-6">
+          <p class="text-xs uppercase text-slate-400 font-semibold">Completed Recoveries</p>
+          <p id="admin-count" class="text-3xl font-extrabold mt-2">79</p>
+          <span class="text-xs text-slate-400">Avg. response: 13 mins</span>
+        </div>
+      </div>
+
+      <!-- Global Pricing Config -->
+      <div class="bg-darkcard border border-slate-800 rounded-2xl p-6 max-w-xl">
+        <h3 class="text-lg font-bold mb-1">Platform Pricing & Commission Settings</h3>
+        <p class="text-xs text-slate-400 mb-4">Modify base rates in real time without touching code.</p>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Base Fare (USD)</label>
+            <input id="cfg-base" type="number" value="25" onchange="updateConfig()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Rate per Km (USD)</label>
+            <input id="cfg-km" type="number" value="3" onchange="updateConfig()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Flippa Investor Modal -->
+  <div id="flippa-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center">
+        <h3 class="text-xl font-bold text-white">RecoveryApp — Digital Asset Overview</h3>
+        <button onclick="toggleFlippaModal()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <p class="text-sm text-slate-300 leading-relaxed">
+        <strong>RecoveryApp</strong> is a turnkey, white-label Roadside Assistance & Towing Dispatch SaaS built for instant deployment on Vercel, Supabase, or Firebase.
+      </p>
+      <ul class="text-sm text-slate-300 space-y-2 list-disc pl-5">
+        <li><strong>3-in-1 Architecture:</strong> Client Booking App, Tow Operator Console & Admin Revenue Dashboard.</li>
+        <li><strong>Multi-Currency & Global Ready:</strong> Supports USD, EUR, and local currencies out of the box.</li>
+        <li><strong>Zero App Store Lock-in:</strong> Progressive Web App (PWA) architecture deployable in 1 click.</li>
+      </ul>
+      <div class="pt-2 flex justify-end">
+        <button onclick="toggleFlippaModal()" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold px-4 py-2 rounded-xl text-sm">Close Preview</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    // State
+    let config = { baseUSD: 25, perKmUSD: 3, multiplier: 1.0, serviceName: 'Flatbed Tow', currency: 'USD' };
+    const rates = { USD: { symbol: '$', rate: 1, decimals: 2 }, EUR: { symbol: '€', rate: 0.92, decimals: 2 }, CLP: { symbol: '$', rate: 950, decimals: 0 } };
+    let jobStep = 0;
+    const jobSteps = [
+      { label: 'Pending Driver Acceptance', progress: 25, btn: 'Accept Recovery Job' },
+      { label: 'Driver En Route to Pickup', progress: 55, btn: 'Mark Vehicle Loaded' },
+      { label: 'Vehicle Loaded — En Route to Drop-off', progress: 80, btn: 'Complete Recovery' },
+      { label: 'Recovery Completed & Paid', progress: 100, btn: 'Reset Demo Job' }
+    ];
+
+    // Map Setup
+    const map = L.map('map').setView([-33.4172, -70.5836], 13);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+    L.marker([-33.4172, -70.5836]).addTo(map).bindPopup('<b>Your Location</b><br>Pickup Point').openPopup();
+    L.marker([-33.4110, -70.5750]).addTo(map).bindPopup('<b>Tow Unit #04</b><br>4 mins away');
+
+    function formatMoney(usdAmount) {
+      const c = rates[config.currency];
+      const val = (usdAmount * c.rate).toFixed(c.decimals);
+      return `${c.symbol}${Number(val).toLocaleString()}`;
+    }
+
+    function selectService(name, mult, btn) {
+      config.serviceName = name;
+      config.multiplier = mult;
+      document.querySelectorAll('.service-opt').forEach(el => {
+        el.classList.remove('border-brand-500', 'bg-brand-500/10', 'text-white');
+        el.classList.add('border-slate-700', 'bg-slate-800/50', 'text-slate-300');
+      });
+      btn.classList.add('border-brand-500', 'bg-brand-500/10', 'text-white');
+      recalculateFare();
+    }
+
+    function recalculateFare() {
+      const km = Number(document.getElementById('distance-slider').value);
+      document.getElementById('km-display').innerText = `${km} km`;
+      const usdTotal = (config.baseUSD + km * config.perKmUSD) * config.multiplier;
+      document.getElementById('fare-amount').innerText = formatMoney(usdTotal);
+      document.getElementById('driver-payout').innerText = formatMoney(usdTotal * 0.85);
+      document.getElementById('driver-job-service').innerText = `${config.serviceName} (${km} km)`;
+    }
+
+    function updateCurrency() {
+      config.currency = document.getElementById('currency-select').value;
+      recalculateFare();
+      document.getElementById('admin-gmv').innerText = formatMoney(4820);
+      document.getElementById('admin-commission').innerText = formatMoney(723);
+    }
+
+    function updateConfig() {
+      config.baseUSD = Number(document.getElementById('cfg-base').value) || 25;
+      config.perKmUSD = Number(document.getElementById('cfg-km').value) || 3;
+      recalculateFare();
+    }
+
+    function submitRequest() {
+      document.getElementById('driver-pickup').innerText = document.getElementById('pickup-input').value;
+      document.getElementById('driver-dropoff').innerText = document.getElementById('dropoff-input').value;
+      jobStep = 0;
+      applyJobUI();
+      alert('Recovery request broadcasted! Switch to the "Tow Driver" tab to accept the job.');
+    }
+
+    function advanceJobStatus() {
+      if (jobStep < jobSteps.length - 1) {
+        jobStep++;
+      } else {
+        jobStep = 0;
+      }
+      applyJobUI();
+    }
+
+    function applyJobUI() {
+      const current = jobSteps[jobStep];
+      document.getElementById('client-status-title').innerText = current.label;
+      document.getElementById('client-status-badge').innerText = current.label;
+      document.getElementById('progress-bar').style.width = `${current.progress}%`;
+      document.getElementById('driver-action-btn').innerText = current.btn;
+    }
+
+    function switchTab(tab) {
+      ['client', 'driver', 'admin'].forEach(t => {
+        document.getElementById(`view-${t}`).classList.add('hidden');
+        const btn = document.getElementById(`tab-${t}`);
+        btn.classList.remove('bg-brand-500', 'text-white');
+        btn.classList.add('text-slate-400');
+      });
+      document.getElementById(`view-${tab}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-${tab}`);
+      activeBtn.classList.add('bg-brand-500', 'text-white');
+      activeBtn.classList.remove('text-slate-400');
+      if (tab === 'client') setTimeout(() => map.invalidateSize(), 150);
+    }
+
+    function toggleFlippaModal() {
+      document.getElementById('flippa-modal').classList.toggle('hidden');
+    }
+
+    function toggleDriverOnline() {
+      const btn = document.getElementById('driver-online-btn');
+      const isOnline = btn.innerText.includes('Online');
+      btn.innerText = isOnline ? '○ Offline' : '● Online & Ready';
+      btn.classList.toggle('bg-emerald-600');
+      btn.classList.toggle('bg-slate-700');
+    }
+
+    recalculateFare();
+  </script>
+</body>
+</html>
